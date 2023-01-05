@@ -1,88 +1,71 @@
 ## TimeAdapt
 
-TimeAdapt makes (i.e. will eventually make) a joint inference of demography and selection from longitudinal population genomic data. The inference is based on approximate Bayesian computation via random forest. It takes whole genome data and information about the ages of samples to perform simulations (using SLiM + pyslim/msprime).
+TimeAdapt makes (*will eventually make*) a joint inference of demography and selection from longitudinal population genomic data. The inference is based on approximate Bayesian computation via random forest. It takes whole genome data and information about the ages of samples to perform simulations (using SLiM + pyslim/msprime).
 
 ### Requirements
 
-The code has been tested with the following versions (on Ubuntu 20.04):
+TimeAdapt is a collection of scripts in Python and SLiM. They have been tested in an Ubuntu (20.04) machine using a Conda environment and using a Snakemake workflow to run them. The Conda environment was created with the following commands (see file `timeadapt.yml` to get version number of each package):
 
-- Python 3.8.10
-  - scikit-allel 1.3.5
-  - msprime 1.0.2
-  - numpy 1.20.3
-  - pyslim 0.403
-  - scipy 1.5.4
-  - pytest 6.2.4
-  - pandas 1.2.4
-  - dill 0.3.4
-  - rpy2 3.4.5
-- R 3.6.3
-  - rcarbon 1.2.0
-- SLiM 3.6
-
-### Usage
-
-TimeAdapt is a collection of scripts in Pyhton. Here it is described how to use them using a conda environment and a snakemake workflow to run them to perform an analysis.
-
-Creation of the environment from scratch:
 ```shell
 conda create -n timeadapt python==3.8.10 r-base=3.6.3
 conda activate timeadapt
-conda install scikit-allel
-pip install msprime
-conda install pyslim
-conda install pytest
-conda install rpy2
-conda install dill
-conda install -c r r-rcarbon
+pip install tskit==0.4.1
+pip install msprime==1.1.0
+pip install pyslim==0.700
+pip install scikit-allel==1.3.5
+pip install pandas
+pip install scipy
+pip install pytest
+pip install flake8
+conda install slim=3.7
+conda install -c r r-rcarbon=1.2.0
+conda install -c r r-ini
+conda install -c r r-extraDistr
+conda install -c r r-testthat
 conda env export > timeadapt.yml
 ```
 
-Creation of the environment via yml file:
-```shell
+Reminder for creating environment from file:
+```
 conda env create -f timeadapt.yml
 ```
 
-You need to prepare four files:
+Install `abcrf` in R via `install.packages()` with appropriate path, e.g.:
 
-*config file*: a ini file with options regarding the Setting, Model, Prior and Statistics to be used in your analysis
-
-*sample file*: a text file (in the form of a space separated table) with metadata of your samples (ID, age, sequencing coverage, etc)
-
-*genome file*: a text file with a description of the genome organization (chromosomes, recombination map)
-
-*data file*: a vcf file with the genetic data
-
-To run different parts of the analysis with snakemake edit snakefile to change the path and name of the file (`options_file`, line 4):
-
-```python
-import configparser
-
-# READ OPTIONS FILE
-options_file = 'path/to/your/config_file.ini'
-...
+```r
+install.packages('abcrf','/home/USER/anaconda3/envs/timeadapt/lib/R/library').
 ```
 
-Before running your analysis is highly recommended to performs some tests. Unit tests (using testthat for R, pytest for Python) con be run using:
+### Usage
+
+Input files:
+
+- *config file*: a ini file with options regarding the Setting, Model, Prior and Statistics to be used in your analysis
+
+- *sample file*: a text file (in the form of a space separated table) with metadata of your samples (ID, age, sequencing coverage, etc)
+
+- *genome file*: a text file with a description of the genome organization (chromosomes, recombination map)
+
+- *data file*: a vcf file with the genetic data
+
+To run different parts of the analysis with snakemake :
 
 ```shell
-conda activate timeadapt
-snakemake test
+snakemake RULE -C options_file='PATH/TO/YOUR/CONFIG_FILE.ini'
 ```
-As intergration test you can use the distributed snakefile (that is with: `options_file = 'tests/input/config_project.ini'`) to run one batch of simulations with Snakefile and get directed acyclic graph of pipeline:
+Where `RULE` is one of the rules defines in the snakefile. For instance, running `snakemake reftable -C options_file='tests/config_project.ini'` will create small reference table using parameters in file `tests/config_project.ini`. Typically the user will use rule `reftable` to run simulations and create the reference table (parameters, summary statistics and latent variables) and `abc` to grow random forests and perform approximate Bayesian computation inferences (rule `abc` will call `reftable` if there is no reference table; there is no need to do it in two steps but it can be usful in many cases).
+
+Before running your analysis is highly recommended to performs some tests. Unit tests (using pytest) can be run using `snakemake test`.
+
+![Directed acyclic graph for the workflow using the test project configuration (`snakemake --dag | dot -Tsvg > workflow_dag.svg`)](workflow_dag.svg)
+
+#### Cleaning old files
+
+You can remove all files (from a specific project or from all projects) from your results folder:
 
 ```shell
-conda activate timeadapt
-snakemake sim
-snakemake --dag | dot -Tsvg > results/workflow_dag.svg
-```
-
-You can remove all files (all projects, all batches) from your results folder, or remove results from your project (all batches) or to remove files from a single batch:
-
-```shell
-snakemeke clean_batch
-snakemake clean_project
-snakemake clean_all
+snakemake clean_project -C options_file='path/to/your/config_file.ini'
+snakemake clean
 ```
 
 
@@ -113,30 +96,8 @@ snakemake clean_all
 
 Example:
 
-```
-[Settings]
-seed = 1234567890
-quiet = False
-project = test
-batch = 1
-sample_file = tests/input/test_sample.txt
-genome_file = tests/input/test_genome.txt
-num_of_sims = 3
+```:tests/config_project.ini
 
-[Model]
-generations_forward = 400
-periods_forward = 8
-periods_coalescence = 1
-
-[Priors]
-gen_len_prior_sh1 = 2
-gen_len_prior_sh2 = 1.465967
-gen_len_prior_min = 26
-gen_len_prior_max = 30
-pop_size_prior_min = 10
-pop_size_prior_max = 200
-mut_rate_prior_mean = 0.00000005
-mut_rate_prior_sd = 0.5
 ```
 
 
@@ -160,7 +121,7 @@ mut_rate_prior_sd = 0.5
 
 ### How to cite TimeAdapt
 
-TimeAdapt implements the method described by Pavinato et al. (2020). The code puts together several tools that should be acknowledged when using TimeAdapt: SLiM, pyslim, msprime (TODO: add full citation for these)
+TimeAdapt implements the method described by Pavinato *et al.* (2020) with some modifications. The code puts together several tools that should be acknowledged when using TimeAdapt: SLiM, pyslim, msprime (TODO: add full citation for these)
 
 
 ### Funding

@@ -19,31 +19,38 @@ import msprime
 import pyslim
 import timeadapt
 
-## how to run:
-#  python scripts/coalsim.py tests/input/config_project.ini tests/input/sim_1.ini
+# import scripts.timeadapt as timeadapt
+# options = timeadapt.get_options('results/test/project_options.ini', 'results/test/1/sim_1.ini')
 
 def main():
   # get options for project and simulation:
   options = timeadapt.get_options(proj_options_file = sys.argv[1], sim_options_file = sys.argv[2])
 
   # print program name
-  timeadapt.print_info(sys.argv[0],options["verbose"],sim=options["sim"])
+  timeadapt.print_info(sys.argv[0],options["verbose"],batch=options["batch"],sim=options["sim"])
   
   # get recombination map:
-  genome_info = timeadapt.get_genome_info(options["genome_file"])
-  rate_map = msprime.RateMap(position = genome_info["msprime_r_map"]["positions"],
-                             rate = genome_info["msprime_r_map"]["rates"]) 
-
+  rate_map = msprime.RateMap(position = options["msprime_r_map"]["positions"],
+                             rate = options["msprime_r_map"]["rates"]) 
+  # get demography
+  demography = msprime.Demography()
+  demography.add_population(name="focal", initial_size=options["N"][0])
+  for i in range(0,len(options["times_of_change_back"])):
+    demography.add_population_parameters_change(time         = options["times_of_change_back"][i],
+                                                initial_size = options["N"][i+1],
+                                                growth_rate  = None,
+                                                population   = "focal")
+  
   # simulate with msprime
   # https://tskit.dev/msprime/docs/latest/intro.html
   msp_ts = msprime.sim_ancestry(samples            = options["N"][0],
-                                population_size    = options["N"][0],
-                                model              = "dtwf",
+                                demography         = demography,
+                                model              = "dtwf", # because sample size = pop size
                                 recombination_rate = rate_map,
                                 random_seed        = options["seed_coal"])
 
   # make tree-sequence a SLiM-tree-sequence
-  slim_ts = pyslim.annotate_defaults(msp_ts, model_type="WF", slim_generation=1)
+  slim_ts = pyslim.annotate_defaults(msp_ts, model_type = "WF", slim_generation = 1)
   
   # save tree
   slim_ts.dump("results/"+options["project"]+"/"+options["batch"]+"/coalsim_"+options["sim"]+".trees")
