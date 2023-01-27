@@ -3,7 +3,7 @@
 ### Model
 
 - [ ] *SNP calling simulation* **high** Test new version of function. Remove variants only polymorphic in aDNA.
-- [ ] *Verify calculation of Ne (latent variable) in SLiM* Is it using the right number of generations?
+- [ ] *Verify calculation of Ne (latent variable) in SLiM* Is it using the right number of generations? **I am working on this[Vitor]**
 - [ ] *Selection.* **high**
   - [ ] *Selection on standing variation.* **high**
   - [ ] *Selection on background selection.* **high**
